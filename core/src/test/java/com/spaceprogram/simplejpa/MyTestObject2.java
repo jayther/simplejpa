@@ -14,6 +14,7 @@ import java.io.Serializable;
  */
 @Entity
 public class MyTestObject2 implements Serializable {
+    @Id
     private String id;
     private String name;
     private Integer someInt;
@@ -45,7 +46,6 @@ public class MyTestObject2 implements Serializable {
         this.someInt = someInt;
     }
 
-    @Id
     public String getId() {
         return id;
     }

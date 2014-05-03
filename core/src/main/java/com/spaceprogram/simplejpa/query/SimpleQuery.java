@@ -42,4 +42,7 @@ public interface SimpleQuery extends Query {
      * @return a representation of the SimpleDB specific query string
      */
     public AmazonQueryString createAmazonQuery(boolean appendLimit);
+    
+    public int getOffset();
+    public boolean hasOffset();
 }

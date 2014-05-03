@@ -4,6 +4,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -80,6 +81,9 @@ public class AnnotationManager {
 
     private AnnotationInfo getAnnotationInfo(String className) {
         AnnotationInfo ai = getAnnotationMap().get(className);
+        if (ai == null) {
+        	ai = putAnnotationInfo(getClass(className, null));
+        }
         return ai;
     }
     
@@ -87,6 +91,9 @@ public class AnnotationManager {
     // I found that the meaning was more visible using another method.
     public AnnotationInfo getAnnotationInfoUsingFullClassName(String fullClassName) {
         AnnotationInfo ai = getAnnotationMap().get(fullClassName);
+        if (ai == null) {
+        	ai = putAnnotationInfo(getClass(fullClassName, null));
+        }
         return ai;
     }
 
@@ -199,7 +206,7 @@ public class AnnotationManager {
         putTableDeclaration(ai, c);
         putProperties(ai, c);
         putMethods(ai, c);
-        if (ai.getIdMethod() == null) {
+        if (ai.getIdProperty() == null) {
             throw new PersistenceException("No ID method specified for: " + c.getName());
         }
         putEntityListeners(ai, c);
@@ -209,6 +216,7 @@ public class AnnotationManager {
     }
 
     private void putMethods(AnnotationInfo ai, Class c) {
+    	/*
         Method[] methods = c.getDeclaredMethods();
         for (Method method : methods) {
 //            logger.fine("method=" + method.getName());
@@ -221,6 +229,7 @@ public class AnnotationManager {
             if (transientM != null) continue; // we don't save this one
             ai.addGetter(method);
         }
+        */
     }
 
 
@@ -239,7 +248,12 @@ public class AnnotationManager {
 
     private void parseProperty(AnnotationInfo ai, Class c, Field field) {
         // TODO add support for OneToOne
+    	/*
         if (!field.isAnnotationPresent(Transient.class) && (field.isAnnotationPresent(ManyToMany.class) || field.isAnnotationPresent(OneToMany.class) || field.isAnnotationPresent(ManyToOne.class) || field.isAnnotationPresent(Id.class))) {
+            ai.addField(field);
+        }
+        */
+        if (!field.isAnnotationPresent(Transient.class) && (field.getModifiers() & Modifier.STATIC) == 0) {
             ai.addField(field);
         }
     }

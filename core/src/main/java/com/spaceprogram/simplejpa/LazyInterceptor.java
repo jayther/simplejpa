@@ -64,9 +64,10 @@ public class LazyInterceptor implements MethodInterceptor, Serializable {
             Object valueToSet = args[0];
             if (valueToSet == null) {
                 // FIXME support direct field accessors better here
-                PersistentMethod persistentMethod = (PersistentMethod)(PersistentMethod)em.getFactory().getAnnotationManager().getAnnotationInfo(obj).getPersistentProperty(attributeName);
-                Method getter = persistentMethod.getGetter();
-                MethodProxy getterProxy = MethodProxy.find(obj.getClass(), new Signature(persistentMethod.getGetter().getName(), Type.getType(getter.getReturnType()), new Type[]{}));
+            	PersistentProperty persistentProperty = em.getFactory().getAnnotationManager().getAnnotationInfo(obj).getPersistentProperty(attributeName);
+                //PersistentMethod persistentMethod = persistentProperty.getGetter();
+                //Method getter = persistentProperty.getGetter();
+                MethodProxy getterProxy = MethodProxy.find(obj.getClass(), new Signature(persistentProperty.getName(), Type.getType(persistentProperty.getPropertyClass()), new Type[]{}));
                 Object ret = getterProxy.invokeSuper(obj, null);
                 if (ret != null) {
                     nulledFields.put(attributeName, ret);

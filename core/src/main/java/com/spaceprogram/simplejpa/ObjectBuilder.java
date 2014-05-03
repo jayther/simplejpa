@@ -2,10 +2,13 @@ package com.spaceprogram.simplejpa;
 
 import com.amazonaws.services.simpledb.model.Attribute;
 import com.spaceprogram.simplejpa.query.QueryImpl;
+
 import net.sf.cglib.proxy.Enhancer;
 
 import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
 import javax.persistence.PersistenceException;
+
 import java.util.*;
 import java.util.logging.Logger;
 
@@ -47,8 +50,9 @@ public class ObjectBuilder {
                     break;
                 }
             }
-            ObjectWithInterceptor owi = newEnancedInstance(em, tClass);
-            newInstance = (T) owi.getBean();
+            //ObjectWithInterceptor owi = newEnancedInstance(em, tClass);
+            //newInstance = (T) owi.getBean();
+            newInstance = tClass.newInstance();
             for (PersistentProperty field : ai.getPersistentProperties()) {
                 String attName = field.getFieldName();
                 String columnName = field.getColumnName();
@@ -62,7 +66,8 @@ public class ObjectBuilder {
                     // todo: stick a cache in here and check the cache for the instance before creating the lazy loader.
                     logger.finest("creating new lazy loading instance for field " + field.getFieldName() + " of class " + tClass.getSimpleName() + " with id " + id);
 //                    Object toSet = newLazyLoadingInstance(retType, keys);
-                    owi.getInterceptor().putForeignKey(attName, keys);
+                    //owi.getInterceptor().putForeignKey(attName, keys);
+                    //TODO implement foreignkey thing
                 } else if (field.isInverseRelationship()) {
                     Class typeInList = field.getPropertyClass();
                     // todo: should this return null if there are no elements??
@@ -84,7 +89,9 @@ public class ObjectBuilder {
                     String lobKeyVal = getValueToSet(atts, lobKeyAttributeName, columnName);
                     logger.finest("lobkeyval to set on interceptor=" + lobKeyVal + " - fromatt=" + lobKeyAttributeName);
                     // TODO add multivalue support for LOB keys
-                    if (lobKeyVal != null) owi.getInterceptor().putForeignKey(attName, Collections.singleton(lobKeyVal));
+                    //if (lobKeyVal != null) owi.getInterceptor().putForeignKey(attName, Collections.singleton(lobKeyVal));
+                    //TODO implement foreignkey thing
+                    
                 } else if (field.getEnumType() != null) {
                     String val = getValueToSet(atts, attName, columnName);
                     if(val != null){
@@ -183,7 +190,7 @@ public class ObjectBuilder {
     }
 
     static String createOneToManyQuery(Class typeInList, String foreignKeyFieldName, AnnotationInfo refAi, Object id, List<PersistentProperty.OrderClause> orderBy) {
-        String foreignIdAttr = refAi.getIdMethod().getFieldName();
+        String foreignIdAttr = refAi.getIdProperty().getFieldName();
         String query = "select o from " + typeInList.getName() + " o where o." + foreignKeyFieldName + "." + foreignIdAttr + " = '" + id + "'";
 
         if (orderBy != null) {

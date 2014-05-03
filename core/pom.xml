@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>SimpleJPA</groupId>
   <artifactId>SimpleJPA</artifactId>
-  <version>1.6-SNAPSHOT-aldrinleal</version>
+  <version>1.6.1-SNAPSHOT-gm</version>
   <name>SimpleJPA</name>
   <dependencies>
     <dependency>

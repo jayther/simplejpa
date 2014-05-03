@@ -3,6 +3,8 @@ package com.spaceprogram.simplejpa;
 import org.apache.commons.lang.StringUtils;
 
 import javax.persistence.*;
+
+import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.*;
 
@@ -10,97 +12,102 @@ import java.util.*;
  * Kerry Wright
  */
 public abstract class PersistentProperty {
-    protected final AnnotatedElement element;
     protected final List<OrderClause> orderBys;
+    protected final Field field;
 
-    protected PersistentProperty(AnnotatedElement annotatedElement) {
-        this.element = annotatedElement;
-        orderBys = parseOrderBy(annotatedElement.getAnnotation(OrderBy.class));
+    protected PersistentProperty(Field field) {
+        field.setAccessible(true);
+        this.field = field;
+        orderBys = parseOrderBy(field.getAnnotation(OrderBy.class));
     }
 
     public Object getProperty(Object target) {
         try {
-            return getGetter().invoke(target);
+        	return field.get(target);
+            //return getGetter().invoke(target);
         } catch (IllegalAccessException e) {
-            throw new IllegalStateException(e);
-        } catch (InvocationTargetException e) {
             throw new IllegalStateException(e);
         }
     }
 
     public void setProperty(Object target, Object value) {
         try {
-            getSetter().invoke(target, value);
+        	field.set(target, value);
+            //getSetter().invoke(target, value);
         } catch (IllegalAccessException e) {
-            throw new IllegalStateException(e);
-        } catch (InvocationTargetException e) {
             throw new IllegalStateException(e);
         }
     }
+    
+    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+    	return field.getAnnotation(annotationClass);
+    }
 
     public Class<?> getPropertyClass() {
-        Class clazz = getGetter().getReturnType();
+        Class clazz = field.getType();
         if (Collection.class.isAssignableFrom(clazz)) {
-            return (Class<?>)((ParameterizedType)getGetter().getGenericReturnType()).getActualTypeArguments()[0];
+        	return (Class<?>)((ParameterizedType)field.getGenericType()).getActualTypeArguments()[0];
+            //return (Class<?>)((ParameterizedType)getGetter().getGenericReturnType()).getActualTypeArguments()[0];
         }
         return clazz;
     }
 
     public Class<?> getRawClass() {
-        return getGetter().getReturnType();
+    	return field.getType();
+        //return getGetter().getReturnType();
     }
 
-    public abstract Method getGetter();
-
-    public abstract Method getSetter();
-
     public abstract String getFieldName();
+    
+    public String getName() {
+    	return field.getName();
+    }
 
     public boolean isLob() {
-        return element.isAnnotationPresent(Lob.class);
+        return field.isAnnotationPresent(Lob.class);
     }
 
     public boolean isForeignKeyRelationship() {
         // TODO add support for non "mapped" OneToMany (ie: unidirectional one-to-many as multivalued attribute)
-        return element.isAnnotationPresent(ManyToOne.class) || element.isAnnotationPresent(ManyToMany.class);
+        return field.isAnnotationPresent(ManyToOne.class) || field.isAnnotationPresent(ManyToMany.class);
     }
 
     public boolean isInverseRelationship() {
-        return element.isAnnotationPresent(OneToMany.class);
+        return field.isAnnotationPresent(OneToMany.class);
     }
 
     public boolean isId() {
-        return element.isAnnotationPresent(Id.class);
+        return field.isAnnotationPresent(Id.class);
     }
 
     public boolean isVersioned() {
-        return element.isAnnotationPresent(Version.class);
+        return field.isAnnotationPresent(Version.class);
     }
 
     public EnumType getEnumType() {
-        if (element.isAnnotationPresent(Enumerated.class)) {
-            if (element.getAnnotation(Enumerated.class).value() == EnumType.STRING) return EnumType.STRING;
+        if (field.isAnnotationPresent(Enumerated.class)) {
+            if (field.getAnnotation(Enumerated.class).value() == EnumType.STRING) return EnumType.STRING;
             else return EnumType.ORDINAL;
         }
         return null;
     }
 
     public String getMappedBy() {
-        if (element.isAnnotationPresent(OneToMany.class)) {
-            return element.getAnnotation(OneToMany.class).mappedBy();
+        if (field.isAnnotationPresent(OneToMany.class)) {
+            return field.getAnnotation(OneToMany.class).mappedBy();
         }
-        else if (element.isAnnotationPresent(OneToOne.class)) {
-            return element.getAnnotation(OneToMany.class).mappedBy();
+        else if (field.isAnnotationPresent(OneToOne.class)) {
+            return field.getAnnotation(OneToMany.class).mappedBy();
         }
-        else if (element.isAnnotationPresent(ManyToMany.class)) {
-            return element.getAnnotation(ManyToMany.class).mappedBy();
+        else if (field.isAnnotationPresent(ManyToMany.class)) {
+            return field.getAnnotation(ManyToMany.class).mappedBy();
         }
         return null;
     }
 
     public String getColumnName() {
-        if (element.isAnnotationPresent(Column.class)) {
-            Column column = element.getAnnotation(Column.class);
+        if (field.isAnnotationPresent(Column.class)) {
+            Column column = field.getAnnotation(Column.class);
             if (column.name() != null && !column.name().trim().isEmpty()) {
                 String columnName = column.name();
                 return columnName;

@@ -22,6 +22,12 @@ package com.spaceprogram.simplejpa.util;
 
 import org.apache.commons.codec.binary.Base64;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -268,6 +274,66 @@ public class AmazonSimpleDBUtil {
      */
     public static byte[] decodeByteArray(String value) throws ParseException {
         return Base64.decodeBase64(value.getBytes());
-
+    }
+    
+    public static String encodeSerializable(Serializable serializable) throws IOException {
+    	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    	ObjectOutputStream oos = null;
+    	try {
+    		oos = new ObjectOutputStream(baos);
+    		oos.writeObject(serializable);
+    		byte[] byteArray = baos.toByteArray();
+    		return encodeByteArray(byteArray);
+    	} catch (IOException e) {
+    		throw new IOException("Error trying to serialize object.", e);
+		} finally {
+    		try {
+    			if (oos != null) {
+    				oos.close();
+    			}
+    		} catch (IOException e) {
+    			//exceptions, they do nothing!
+    		}
+    		try {
+    			baos.close();
+    		} catch (IOException e) {
+    			//exceptions, they do nothing!
+    		}
+    	}
+    }
+    
+    public static Object decodeSerializable(String encoded) throws ParseException, IOException, ClassNotFoundException {
+    	byte[] byteArray = decodeByteArray(encoded);
+    	ByteArrayInputStream bais = new ByteArrayInputStream(byteArray);
+    	ObjectInputStream ois = null;
+    	try {
+			ois = new ObjectInputStream(bais);
+			Object obj = ois.readObject();
+			return obj;
+		} catch (ClassNotFoundException e) {
+    		throw new ClassNotFoundException("Class not found for deserialized object.", e);
+		} catch (IOException e) {
+    		throw new IOException("Error trying to deserialize object.", e);
+		} finally {
+			try {
+				if (ois != null) {
+					ois.close();
+				}
+			} catch (IOException e) {
+				//do nothing
+			}
+			try {
+				bais.close();
+			} catch (IOException e) {
+				//do nothing
+			}
+		}
+    }
+    
+    public static String encodeBoolean(Boolean value) {
+    	return value ? "true" : "false";
+    }
+    public static Boolean decodeBoolean(String value) {
+    	return value.equalsIgnoreCase("true");
     }
 }

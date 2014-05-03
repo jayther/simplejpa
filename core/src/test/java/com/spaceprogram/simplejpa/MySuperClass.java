@@ -12,9 +12,9 @@ import java.io.Serializable;
 @MappedSuperclass
 public class MySuperClass implements Serializable {
 
+    @Id
     private String id;
 
-    @Id
     public String getId() {
         return id;
     }

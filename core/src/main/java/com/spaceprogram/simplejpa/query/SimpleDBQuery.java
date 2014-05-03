@@ -5,6 +5,7 @@ import com.spaceprogram.simplejpa.EntityManagerSimpleJPA;
 
 import javax.persistence.Query;
 import javax.persistence.TemporalType;
+
 import java.util.*;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -17,6 +18,7 @@ public class SimpleDBQuery extends AbstractQuery {
     private static Logger logger = Logger.getLogger(SimpleDBQuery.class.getName());
     
     private final String originalQuery;
+    private int offset = -1;
     private static final Pattern COUNT_REGEX = Pattern.compile("select(\\s+.*\\s+)from\\s+.*", Pattern.CASE_INSENSITIVE);
     private static final Pattern CLASS_REGEX = Pattern.compile(".*\\s+from\\s+([\\w|\\.]+)", Pattern.CASE_INSENSITIVE);
 
@@ -85,5 +87,15 @@ public class SimpleDBQuery extends AbstractQuery {
             originalQuery = originalQuery.replaceAll(":"+entry.getKey()+" ", "'"+stringVal+"' ");
         }
         return originalQuery.trim();
+    }
+    
+    public void setOffset(int offset) {
+    	this.offset = offset;
+    }
+    public int getOffset() {
+    	return offset;
+    }
+    public boolean hasOffset() {
+    	return offset != -1;
     }
 }

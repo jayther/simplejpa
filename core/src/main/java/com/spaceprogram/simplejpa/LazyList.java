@@ -10,12 +10,14 @@ import java.util.logging.Logger;
 import javax.persistence.PersistenceException;
 
 import com.amazonaws.AmazonClientException;
+import com.amazonaws.services.simpledb.model.Attribute;
 import com.amazonaws.services.simpledb.model.Item;
 import com.amazonaws.services.simpledb.model.SelectResult;
 import com.spaceprogram.simplejpa.query.JPAQuery;
 import com.spaceprogram.simplejpa.query.QueryImpl;
-
+import com.spaceprogram.simplejpa.query.SimpleDBQuery;
 import com.spaceprogram.simplejpa.query.SimpleQuery;
+
 import org.apache.commons.collections.list.GrowthList;
 
 /**
@@ -40,6 +42,9 @@ public class LazyList<E> extends AbstractList<E> implements Serializable {
     private int maxResults = -1;
     private int maxResultsPerToken = SimpleQuery.MAX_RESULTS_PER_REQUEST;
     private boolean consistentRead = true;
+    
+    private boolean offsetExecuted = false;
+    private String offsetQuery = null;
 
     public LazyList(EntityManagerSimpleJPA em, Class tClass, SimpleQuery query) {
         this.em = em;
@@ -47,6 +52,9 @@ public class LazyList<E> extends AbstractList<E> implements Serializable {
         this.origQuery = query;
         this.maxResults = query.getMaxResults();
         this.consistentRead = query.isConsistentRead();
+        if (query.hasOffset()) {
+        	this.offsetQuery = SimpleDBQuery.convertToCountQuery(query.createAmazonQuery(false).getValue());
+        }
         AnnotationInfo ai = em.getAnnotationManager().getAnnotationInfo(genericReturnType);
         try {
             domainName = em.getDomainName(ai.getRootClass());
@@ -114,6 +122,55 @@ public class LazyList<E> extends AbstractList<E> implements Serializable {
 
         if (backingList == null) {
             backingList = new GrowthList();
+        }
+        if (offsetQuery != null && !offsetExecuted) {
+        	offsetExecuted = true;
+        	int expectedOffset = origQuery.getOffset();
+        	int currentCount = 0;
+        	while (currentCount < expectedOffset) {
+        		SelectResult qr;
+        		try {
+        			if (logger.isLoggable(Level.FINER)) {
+        				logger.finer("offset query for lazylist=" + offsetQuery);
+        			}
+        			int limit = expectedOffset - currentCount;
+        			String limitQuery = offsetQuery + " limit " + limit;
+                    if (em.getFactory().isPrintQueries())
+                        System.out.println("offset query in lazylist=" + limitQuery);
+                    qr = DomainHelper.selectItems(this.em.getSimpleDb(), limitQuery, nextToken, isConsistentRead());
+                    for (Item item : qr.getItems()) {
+                    	for (Attribute attribute : item.getAttributes()) {
+                    		if (attribute.getName().equalsIgnoreCase("count")) {
+                    			try {
+                                    currentCount += Integer.parseInt(attribute.getValue());
+                    			} catch (NumberFormatException e) {
+                    				//do nothing
+                    			}
+                    		}
+                    	}
+                    }
+                    
+                    if (qr.getNextToken() == null) {
+                    	nextToken = null;
+                        break;
+                    }
+                    if (!noLimit() && currentCount == expectedOffset) {
+                        break;
+                    }
+
+                    if (!noLimit() && currentCount > expectedOffset) {
+                        throw new PersistenceException("Got more results than the offset.");
+                    }
+
+                    nextToken = qr.getNextToken();
+        		} catch (AmazonClientException e) {
+                    throw new PersistenceException("Offsest query failed: Domain=" + domainName + " -> " + origQuery + "; offset query: " + offsetQuery, e);
+        		}
+        	}
+            
+            if (nextToken == null) {
+            	return;
+            }
         }
 
         while (backingList.size() <= index) {

@@ -117,7 +117,7 @@ public class QueryImpl extends AbstractQuery {
 // System.out.println("getter=" + getterForField);
             String paramValue = getParamValueAsStringForAmazonQuery(param, getterForField);
             logger.finest("paramValue=" + paramValue);
-            String idFieldName = refAi.getIdMethod().getFieldName();
+            String idFieldName = refAi.getIdProperty().getFieldName();
             if (idFieldName.equals(field)) {
                 logger.finer("Querying using id field, no second query required.");
                 appendFilter(sb, NamingHelper.foreignKey(refObjectField), comparator, paramValue);
@@ -439,5 +439,14 @@ public class QueryImpl extends AbstractQuery {
     public String toString() {
         return "QueryImpl{" + "em=" + em + ", q=" + q + ", parameters=" + parameters + ", maxResults=" + maxResults + ", qString='" + qString + '\'' + '}';
     }
+	
+	@Override
+	public int getOffset() {
+		return q.getOffset();
+	}
 
+	@Override
+	public boolean hasOffset() {
+		return q.getOffset() != -1;
+	}
 }

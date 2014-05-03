@@ -176,6 +176,21 @@ public class EntityManagerFactoryImpl implements EntityManagerFactory {
      * http://code.google.com/p/simplejpa/wiki/WebApplications
      * 
      * @param persistenceUnitName
+     *            used to prefix the SimpleDB domains
+     * @param props
+     *            should have accessKey and secretKey
+     * @param libsToScan
+     *            a set of
+     */
+    public EntityManagerFactoryImpl(String persistenceUnitName, Map props, Set<String> libsToScan) {
+        this(persistenceUnitName, props, libsToScan, null);
+    }
+
+    /**
+     * Use this one in web applications, see:
+     * http://code.google.com/p/simplejpa/wiki/WebApplications
+     * 
+     * @param persistenceUnitName
      * @param props
      * @param libsToScan
      *            a set of

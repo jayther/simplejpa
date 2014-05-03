@@ -17,7 +17,7 @@ import java.util.List;
 public class AnnotationInfo {
 
     private Annotation[] classAnnotations;
-    private PersistentProperty idMethod;
+    private PersistentProperty idProperty;
     private Map<String, PersistentProperty> persistentProperties = new HashMap();
     private String discriminatorValue;
     private String domainName;
@@ -30,7 +30,7 @@ public class AnnotationInfo {
     }
 
     public void setIdProperty(PersistentProperty property) {
-        this.idMethod = property;
+        this.idProperty = property;
     }
 
     public void setDomainName(String domainName) {
@@ -41,23 +41,14 @@ public class AnnotationInfo {
         return classAnnotations;
     }
 
-    public PersistentProperty getIdMethod() {
-        return idMethod;
+    public PersistentProperty getIdProperty() {
+        return idProperty;
     }
 
 	public String getDomainName()
 	{
 		return domainName;
 	}
-
-    public PersistentProperty addGetter(Method method) {
-        PersistentMethod persistentMethod = new PersistentMethod(method);
-        // if we already have an accessor in the list, don't overwrite it
-        if (persistentProperties.containsKey(persistentMethod.getFieldName())) return persistentProperties.get(persistentMethod.getFieldName());
-        persistentProperties.put(persistentMethod.getFieldName(), persistentMethod);
-        if (persistentMethod.isId()) setIdProperty(persistentMethod);
-        return persistentMethod;
-    }
 
     public PersistentProperty addField(Field field) {
         PersistentField persistentField = new PersistentField(field);

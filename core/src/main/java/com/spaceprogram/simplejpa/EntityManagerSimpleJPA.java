@@ -3,6 +3,8 @@ package com.spaceprogram.simplejpa;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.io.Serializable;
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -131,6 +133,21 @@ public class EntityManagerSimpleJPA implements SimpleEntityManager, DatabaseMana
             return AmazonSimpleDBUtil.encodeDate(d);
         } else if (ob instanceof byte[]) {
             return AmazonSimpleDBUtil.encodeByteArray((byte[]) ob);
+        } else if (ob instanceof Boolean) {
+        	return AmazonSimpleDBUtil.encodeBoolean((Boolean)ob);
+        } else if (ob instanceof String) {
+        	return ob.toString();
+        } else {
+        	String encoded = null;
+        	try {
+				encoded = AmazonSimpleDBUtil.encodeSerializable((Serializable)ob);
+			} catch (IOException e) {
+				logger.fine("Cannot serialize object: " + e.getMessage());
+				encoded = null;
+			}
+        	if (encoded != null) {
+        		return encoded;
+        	}
         }
         return ob.toString();
     }
@@ -148,7 +165,7 @@ public class EntityManagerSimpleJPA implements SimpleEntityManager, DatabaseMana
         if (ai == null)
             return null; // todo: should it throw?
         String id = null;
-        return (String) ai.getIdMethod().getProperty(o);
+        return (String) ai.getIdProperty().getProperty(o);
     }
 
     public String getDomainName(Class<? extends Object> aClass) {
@@ -435,9 +452,11 @@ public class EntityManagerSimpleJPA implements SimpleEntityManager, DatabaseMana
             String attName = property.getFieldName();
             Class retType = property.getRawClass();
 // logger.fine("getter in setFieldValue = " + attName + " - valAsString=" + valAsString + " rettype=" + retType);
-            Method setMethod = tClass.getMethod("set" + StringUtils.capitalize(attName), retType);
             Object newField = convert(vals, property, property.getRawClass());
-            setMethod.invoke(newInstance, newField);
+            property.setProperty(newInstance, newField);
+            //Method setMethod = tClass.getMethod("set" + StringUtils.capitalize(attName), retType);
+            //Object newField = convert(vals, property, property.getRawClass());
+            //setMethod.invoke(newInstance, newField);
         } catch (Exception e) {
             throw new PersistenceException("Failed setting field of getter: " + property.getFieldName() + ", using value: " + vals, e);
         }
@@ -717,6 +736,8 @@ public class EntityManagerSimpleJPA implements SimpleEntityManager, DatabaseMana
             else newField = Double.NaN;
             if (retType == double.class)
                 retType = Double.class;
+        } else if (Boolean.class.isAssignableFrom(retType) || retType == boolean.class) {
+        	newField = AmazonSimpleDBUtil.decodeBoolean(values.iterator().next());
         } else if (BigDecimal.class.isAssignableFrom(retType)) {
             val = AmazonSimpleDBUtil.decodeRealNumberRange(values.iterator().next(), AmazonSimpleDBUtil.LONG_DIGITS, EntityManagerSimpleJPA.OFFSET_VALUE).toString();
         } else if (byte[].class.isAssignableFrom(retType)) {
@@ -729,19 +750,72 @@ public class EntityManagerSimpleJPA implements SimpleEntityManager, DatabaseMana
                 coll.add(convert(Collections.singleton(value), property, property.getPropertyClass()));
             }
             newField = coll;
+        } else if (String.class.isAssignableFrom(retType) || retType == String.class ){
+        	newField = values.iterator().next();
         } else {
-            val = values.iterator().next();
+            //adapted from https://github.com/mikrado/simplejpa/commit/5df06fd93b2135e6868b150b9a536755cabc819c
+        	String useVal = values.iterator().next();
+        	Object obj = null;
+        	String encoded = null;
+        	if (values.size() > 1) {
+            	// Value has been split into multiple chunks.
+            	// 1. Order chunks according to attached counter.
+        		String[] chunks = new String[values.size()];
+        		for (String value : values) {
+        			String chunk = value;
+            		int counter = Integer.parseInt("" + chunk.charAt(chunk.length() - 4)) * 1000 + Integer.parseInt("" + chunk.charAt(chunk.length() - 3)) * 100 + Integer.parseInt("" + chunk.charAt(chunk.length() - 2)) * 10 + Integer.parseInt("" + chunk.charAt(chunk.length() - 1));
+            		chunks[counter] = chunk.substring(0, chunk.length() - 4);
+        		}
+            	// 2. Append chunks.
+            	StringBuffer sb = new StringBuffer();
+            	for (String chunk : chunks) {
+            		sb.append(chunk);
+            	}
+                encoded = sb.toString();
+        	} else if (values.size() == 1) {
+        		encoded = useVal;
+        	}
+        	if (encoded != null) {
+	        	try {
+					obj = AmazonSimpleDBUtil.decodeSerializable(encoded);
+					newField = retType.cast(obj);
+	        	} catch (ClassCastException e) {
+	        		logger.fine("Object not deserializable. Attempting default casting.");
+	        		obj = null;
+				} catch (ClassNotFoundException e) {
+	        		logger.fine("Object not deserializable. Attempting default casting.");
+	        		obj = null;
+				} catch (IOException e) {
+	        		logger.fine("Object not deserializable. Attempting default casting.");
+	        		obj = null;
+				}
+        	}
+        	if (newField == null) {
+                val = useVal;
+        	}
         }
         // If newField has not been created yet then we create it from val.
         if (newField == null) {
             // We build a new field object here because we may get an argument mismatch otherwise, eg: BigDecimal for an Integer field.
             // todo: getConstructor throws a NoSuchMethodException here, should ensure that these are second class object fields
-            Constructor forNewField = retType.getConstructor(val.getClass());
-            if (forNewField == null) {
-                throw new PersistenceException("No constructor for field type: " + retType + " that can take a " + val.getClass());
-            }
-            newField = forNewField.newInstance(val);
+        	try {
+        		Constructor forNewField = retType.getConstructor(val.getClass());
+                
+                if (forNewField == null) {
+                    throw new PersistenceException("No constructor for field type: " + retType + " that can take a " + val.getClass());
+                }
+                newField = forNewField.newInstance(val);
+        	} catch (NoSuchMethodException e) {
+        		newField = null;
+        	}
         }
+    	if (newField == null) {
+    		try {
+    		newField = retType.cast(val);
+    		} catch (ClassCastException e) {
+    			throw new PersistenceException("Can't cast " + val.getClass() +  " value to correct type (" + retType + "). Tried everything.");
+    		}
+    	}
         return (T)newField;
     }
 }

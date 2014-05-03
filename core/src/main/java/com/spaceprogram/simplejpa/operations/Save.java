@@ -5,8 +5,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectOutputStream;
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -76,7 +78,7 @@ public class Save implements Callable {
             id = UUID.randomUUID().toString();
             // System.out.println("new object, setting id");
             AnnotationInfo ai = em.getFactory().getAnnotationManager().getAnnotationInfo(o);
-            em.setFieldValue(o.getClass(), o, ai.getIdMethod(), Collections.singleton(id));
+            em.setFieldValue(o.getClass(), o, ai.getIdProperty(), Collections.singleton(id));
         }
         em.cachePut(id, o);
         return id;
@@ -96,6 +98,7 @@ public class Save implements Callable {
     protected void persistOnly(Object o, String id) throws AmazonClientException, IllegalAccessException,
             InvocationTargetException, IOException {
         long start = System.currentTimeMillis();
+        //System.out.println("persistOnly: called " + o.getClass().getAnnotations().toString());
         em.invokeEntityListener(o, newObject ? PrePersist.class : PreUpdate.class);
         AnnotationInfo ai = em.getFactory().getAnnotationManager().getAnnotationInfo(o);
 
@@ -131,6 +134,7 @@ public class Save implements Callable {
         }
 
         for (PersistentProperty field : ai.getPersistentProperties()) {
+        	//System.out.println("Rawr: " + field.getFieldName());
             Object ob = field.getProperty(o);
 
             String columnName = field.getColumnName();
@@ -151,7 +155,7 @@ public class Save implements Callable {
 
                     /* check if we should persist this */
                     boolean persistRelationship = false;
-                    ManyToOne a = field.getGetter().getAnnotation(ManyToOne.class);
+                    ManyToOne a = field.getAnnotation(ManyToOne.class);
                     if (a != null && null != a.cascade()) {
                         CascadeType[] cascadeType = a.cascade();
                         for (CascadeType type : cascadeType) {
@@ -183,7 +187,7 @@ public class Save implements Callable {
                 // OneToMany collection
                 /* check if we should persist this */
                 boolean persistRelationship = false;
-                OneToMany a = field.getGetter().getAnnotation(OneToMany.class);
+                OneToMany a = field.getAnnotation(OneToMany.class);
                 CascadeType[] cascadeType = a.cascade();
                 for (CascadeType type : cascadeType) {
                     if (CascadeType.ALL == type || CascadeType.PERSIST == type) {
@@ -237,10 +241,43 @@ public class Save implements Callable {
                     attsToPut.add(new ReplaceableAttribute(columnName, toSet, true));
                 }
             } else {
+            	/*
                 String toSet = ob != null ? em.padOrConvertIfRequired(ob) : "";
                 // todo: throw an exception if this is going to exceed maximum
                 // size, suggest using @Lob
                 attsToPut.add(new ReplaceableAttribute(columnName, toSet, true));
+                */
+
+                String toSet = ob != null ? em.padOrConvertIfRequired(ob) : "";
+
+                try {
+                	// Check size of encoded value.
+                	byte[] bytes = toSet.getBytes("UTF-8");
+                	if (bytes.length > 1024) {
+                        // Maximum size is exceeded; split value into multiple chunks.
+                		int i = 0, pos = 0;
+                		while (pos < bytes.length) {
+                			int size = 1020;
+                			// Beware: do not split encoded characters.
+                			// (Additional bytes of an encoded character follow the pattern 10xxxxxx.)
+                			while (pos + size < bytes.length && (bytes[pos + size] & 0xc0) == 0x80) {
+                				size --;
+                			}
+                			String chunk = new String(Arrays.copyOfRange(bytes, pos, Math.min(pos + size, bytes.length)), "UTF-8");
+                			// Add four digit counter.
+                			String counter = Integer.toString(i / 1000 % 10) + Integer.toString(i / 100 % 10) + Integer.toString(i / 10 % 10) + Integer.toString(i % 10);
+                            attsToPut.add(new ReplaceableAttribute(columnName, chunk + counter, i == 0));
+                            i ++;
+                            pos += size;
+                		}
+                	} else {
+                		// Simply store string as single value.
+                        attsToPut.add(new ReplaceableAttribute(columnName, toSet, true));
+                	}
+                } catch (UnsupportedEncodingException x) {
+                    // should never happen
+                    throw new PersistenceException("Encoding 'UTF-8' is not supported!", x);
+                }
             }
         }
 

@@ -155,6 +155,9 @@ public class JPAQueryParser
             {
                 compileOrder();
             }
+            if (tokenizer.parseKeywordIgnoreCase("OFFSET")) {
+            	compileOffset();
+            }
         }
 
         private void compileResult()
@@ -225,6 +228,21 @@ public class JPAQueryParser
                 throw new RuntimeException("keyword without value: ORDER BY");
             }
             query.setOrdering(content);
+        }
+        private void compileOffset() {
+        	String content = tokenizer.parseContent();
+        	if (content.length() == 0) {
+        		throw new RuntimeException("keyword without value: OFFSET");
+        	}
+        	try {
+        		int offset = Integer.parseInt(content);
+        		if (offset < 1) {
+        			throw new RuntimeException("OFFSET value cannot be less than 1");
+        		}
+        		query.setOffset(offset);
+        	} catch (NumberFormatException e) {
+        		throw new RuntimeException("Invalid number for OFFSET", e);
+        	}
         }
     }
 

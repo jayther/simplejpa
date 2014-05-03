@@ -17,12 +17,15 @@ import java.lang.reflect.*;
  */
 public class PersistentField extends PersistentProperty {
     private final Field field;
+    /*
     private Method getter = null;
     private Method setter = null;
+    */
 
     public PersistentField(Field field) {
         super(field);
         this.field = field;
+        /*
         try {
             BeanInfo info = Introspector.getBeanInfo(field.getDeclaringClass());
             for (PropertyDescriptor descriptor : info.getPropertyDescriptors()) {
@@ -32,18 +35,11 @@ public class PersistentField extends PersistentProperty {
                     break;
                 }
             }
-            if (getter == null || setter == null) throw new IllegalArgumentException("Only fields with valid JavaBean accessors can be annotated");
+            //if (getter == null || setter == null) throw new IllegalArgumentException("Only fields with valid JavaBean accessors can be annotated");
         } catch (IntrospectionException e) {
             throw new IllegalArgumentException("Could not introspect field: "+field);
         }
-    }
-
-    public Method getGetter() {
-        return getter;
-    }
-
-    public Method getSetter() {
-        return setter;
+        */
     }
 
     public String getFieldName() {
