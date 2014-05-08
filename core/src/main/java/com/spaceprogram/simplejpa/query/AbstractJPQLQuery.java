@@ -7,14 +7,15 @@ package com.spaceprogram.simplejpa.query;
  */
 public class AbstractJPQLQuery implements Cloneable {
     public static final String[] SINGLE_STRING_KEYWORDS = {
-            "SELECT", "UPDATE", "DELETE", "UNIQUE", "FROM", "WHERE", "GROUP BY", "HAVING", "ORDER BY", "OFFSET"
-
+            "SELECT", "UPDATE", "DELETE", "UNIQUE", "FROM", "WHERE",
+            "GROUP BY", "HAVING", "ORDER BY", "OFFSET", "LIMIT"
     };
     private String result;
     private String from;
     private String filter;
     private String ordering;
     private int offset = -1;
+    private int limit = -1;
 
     public void setGrouping(String groupingClause) {
 
@@ -62,6 +63,16 @@ public class AbstractJPQLQuery implements Cloneable {
     public boolean hasOffset() {
     	return offset != -1;
     }
+
+	public void setLimit(int limit) {
+		this.limit = limit;
+	}
+	public int getLimit() {
+		return limit;
+	}
+	public boolean hasLimit() {
+		return limit != -1;
+	}
 
     @Override
     public Object clone() throws CloneNotSupportedException {

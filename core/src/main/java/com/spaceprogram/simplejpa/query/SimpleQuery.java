@@ -45,4 +45,7 @@ public interface SimpleQuery extends Query {
     
     public int getOffset();
     public boolean hasOffset();
+    
+    public int getLimit();
+    public boolean hasLimit();
 }

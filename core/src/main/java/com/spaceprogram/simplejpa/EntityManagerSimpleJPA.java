@@ -750,8 +750,6 @@ public class EntityManagerSimpleJPA implements SimpleEntityManager, DatabaseMana
                 coll.add(convert(Collections.singleton(value), property, property.getPropertyClass()));
             }
             newField = coll;
-        } else if (String.class.isAssignableFrom(retType) || retType == String.class ){
-        	newField = values.iterator().next();
         } else {
             //adapted from https://github.com/mikrado/simplejpa/commit/5df06fd93b2135e6868b150b9a536755cabc819c
         	String useVal = values.iterator().next();
@@ -776,19 +774,23 @@ public class EntityManagerSimpleJPA implements SimpleEntityManager, DatabaseMana
         		encoded = useVal;
         	}
         	if (encoded != null) {
-	        	try {
-					obj = AmazonSimpleDBUtil.decodeSerializable(encoded);
-					newField = retType.cast(obj);
-	        	} catch (ClassCastException e) {
-	        		logger.fine("Object not deserializable. Attempting default casting.");
-	        		obj = null;
-				} catch (ClassNotFoundException e) {
-	        		logger.fine("Object not deserializable. Attempting default casting.");
-	        		obj = null;
-				} catch (IOException e) {
-	        		logger.fine("Object not deserializable. Attempting default casting.");
-	        		obj = null;
-				}
+        		if (String.class.isAssignableFrom(retType) || retType == String.class) {
+                	newField = encoded;
+        		} else {
+		        	try {
+						obj = AmazonSimpleDBUtil.decodeSerializable(encoded);
+						newField = retType.cast(obj);
+		        	} catch (ClassCastException e) {
+		        		logger.fine("Object not deserializable. Attempting default casting.");
+		        		obj = null;
+					} catch (ClassNotFoundException e) {
+		        		logger.fine("Object not deserializable. Attempting default casting.");
+		        		obj = null;
+					} catch (IOException e) {
+		        		logger.fine("Object not deserializable. Attempting default casting.");
+		        		obj = null;
+					}
+        		}
         	}
         	if (newField == null) {
                 val = useVal;

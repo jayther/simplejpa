@@ -447,6 +447,16 @@ public class QueryImpl extends AbstractQuery {
 
 	@Override
 	public boolean hasOffset() {
-		return q.getOffset() != -1;
+		return q.hasOffset();
+	}
+
+	@Override
+	public int getLimit() {
+		return q.getLimit();
+	}
+
+	@Override
+	public boolean hasLimit() {
+		return q.hasLimit();
 	}
 }

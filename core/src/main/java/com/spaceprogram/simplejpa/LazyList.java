@@ -55,6 +55,9 @@ public class LazyList<E> extends AbstractList<E> implements Serializable {
         if (query.hasOffset()) {
         	this.offsetQuery = SimpleDBQuery.convertToCountQuery(query.createAmazonQuery(false).getValue());
         }
+        if (query.hasLimit()) {
+        	setMaxResultsPerToken(query.getLimit());
+        }
         AnnotationInfo ai = em.getAnnotationManager().getAnnotationInfo(genericReturnType);
         try {
             domainName = em.getDomainName(ai.getRootClass());

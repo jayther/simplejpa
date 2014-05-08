@@ -19,6 +19,7 @@ public class SimpleDBQuery extends AbstractQuery {
     
     private final String originalQuery;
     private int offset = -1;
+    private int limit = -1;
     private static final Pattern COUNT_REGEX = Pattern.compile("select(\\s+.*\\s+)from\\s+.*", Pattern.CASE_INSENSITIVE);
     private static final Pattern CLASS_REGEX = Pattern.compile(".*\\s+from\\s+([\\w|\\.]+)", Pattern.CASE_INSENSITIVE);
 
@@ -97,5 +98,15 @@ public class SimpleDBQuery extends AbstractQuery {
     }
     public boolean hasOffset() {
     	return offset != -1;
+    }
+    
+    public void setLimit(int limit) {
+    	this.limit = limit;
+    }
+    public int getLimit() {
+    	return limit;
+    }
+    public boolean hasLimit() {
+    	return limit != -1;
     }
 }

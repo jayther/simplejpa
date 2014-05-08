@@ -158,6 +158,9 @@ public class JPAQueryParser
             if (tokenizer.parseKeywordIgnoreCase("OFFSET")) {
             	compileOffset();
             }
+            if (tokenizer.parseKeywordIgnoreCase("LIMIT")) {
+            	compileLimit();
+            }
         }
 
         private void compileResult()
@@ -242,6 +245,21 @@ public class JPAQueryParser
         		query.setOffset(offset);
         	} catch (NumberFormatException e) {
         		throw new RuntimeException("Invalid number for OFFSET", e);
+        	}
+        }
+        private void compileLimit() {
+        	String content = tokenizer.parseContent();
+        	if (content.length() == 0) {
+        		throw new RuntimeException("keyword without value: LIMIT");
+        	}
+        	try {
+        		int limit = Integer.parseInt(content);
+        		if (limit < 1) {
+        			throw new RuntimeException("LIMIT value cannot be less than 1");
+        		}
+        		query.setLimit(limit);
+        	} catch (NumberFormatException e) {
+        		throw new RuntimeException("Invalid number for LIMIT", e);
         	}
         }
     }
