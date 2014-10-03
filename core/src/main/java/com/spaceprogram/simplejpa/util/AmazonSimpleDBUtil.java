@@ -32,6 +32,7 @@ import java.math.BigDecimal;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.TimeZone;
 
 /**
  * Provides collection of static functions for conversion of various values into strings that may be
@@ -239,6 +240,7 @@ public class AmazonSimpleDBUtil {
      */
     public static String encodeDate(Date date) {
         SimpleDateFormat dateFormatter = new SimpleDateFormat(dateFormat);
+        dateFormatter.setTimeZone(TimeZone.getTimeZone("UTC"));
         /* Java doesn't handle ISO8601 nicely: need to add ':' manually */
         String result = dateFormatter.format(date);
         return result.substring(0, result.length() - 2) + ":" + result.substring(result.length() - 2);
@@ -253,6 +255,7 @@ public class AmazonSimpleDBUtil {
     public static Date decodeDate(String value) throws ParseException {
         String javaValue = value.substring(0, value.length() - 3) + value.substring(value.length() - 2);
         SimpleDateFormat dateFormatter = new SimpleDateFormat(dateFormat);
+        dateFormatter.setTimeZone(TimeZone.getTimeZone("UTC"));
         return dateFormatter.parse(javaValue);
     }
 

@@ -186,8 +186,34 @@ public abstract class AbstractQuery implements SimpleQuery {
                 String nextToken = null;
                 SelectResult qr;
                 long count = 0;
+                boolean reachedEnd = false;
+                if (hasOffset()) {
+                	long expectedOffset = getOffset();
 
-                while ((qr = DomainHelper.selectItems(this.em.getSimpleDb(), amazonQuery.getValue(), nextToken)) != null) {
+                    AmazonQueryString amazonOffsetQuery = createAmazonQuery(false);
+                    while (expectedOffset > 0 && (qr = DomainHelper.selectItems(this.em.getSimpleDb(), amazonOffsetQuery.getValue() + " limit " + expectedOffset, nextToken)) != null) {
+                        Map<String, List<Attribute>> itemMap = new HashMap<String, List<Attribute>>();
+                        for (Item item : qr.getItems()) {
+                            itemMap.put(item.getName(), item.getAttributes());
+                        }
+
+                        for (String id : itemMap.keySet()) {
+                            List<Attribute> list = itemMap.get(id);
+                            for (Attribute itemAttribute : list) {
+                                if (itemAttribute.getName().equals("Count")) {
+                                    expectedOffset -= Long.parseLong(itemAttribute.getValue());
+                                }
+                            }
+                        }
+                        nextToken = qr.getNextToken();
+                        if (nextToken == null) {
+                        	reachedEnd = true;
+                            break;
+                        }
+                    }
+                }
+
+                while (!reachedEnd && (qr = DomainHelper.selectItems(this.em.getSimpleDb(), amazonQuery.getValue(), nextToken)) != null) {
                     Map<String, List<Attribute>> itemMap = new HashMap<String, List<Attribute>>();
                     for (Item item : qr.getItems()) {
                         itemMap.put(item.getName(), item.getAttributes());
@@ -203,6 +229,7 @@ public abstract class AbstractQuery implements SimpleQuery {
                     }
                     nextToken = qr.getNextToken();
                     if (nextToken == null) {
+                    	reachedEnd = true;
                         break;
                     }
                 }

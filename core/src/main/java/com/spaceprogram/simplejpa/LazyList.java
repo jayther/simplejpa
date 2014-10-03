@@ -82,6 +82,7 @@ public class LazyList<E> extends AbstractList<E> implements Serializable {
 
         if (backingList != null && nextToken == null) {
             count = backingList.size();
+            return count;
         }
         return origQuery.getCount();
     }
