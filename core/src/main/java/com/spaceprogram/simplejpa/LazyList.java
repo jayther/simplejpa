@@ -45,6 +45,10 @@ public class LazyList<E> extends AbstractList<E> implements Serializable {
     
     private boolean offsetExecuted = false;
     private String offsetQuery = null;
+    
+    private String offsetNextToken = null;
+    
+    private boolean loadAllOnSize = false;
 
     public LazyList(EntityManagerSimpleJPA em, Class tClass, SimpleQuery query) {
         this.em = em;
@@ -80,6 +84,18 @@ public class LazyList<E> extends AbstractList<E> implements Serializable {
     public int size() {
         if (count > -1) return count;
 
+        if (loadAllOnSize) {
+        	if (origQuery.hasLimit()) {
+        		loadAtleastItems(origQuery.getLimit() - 1);
+        	} else if (!noLimit()) {
+        		loadAtleastItems(maxResults - 1);
+        	} else {
+        		loadAtleastItems(Integer.MAX_VALUE);
+        	}
+        } else {
+        	calculateCountWithOffset();
+        	return count;
+        }
         if (backingList != null && nextToken == null) {
             count = backingList.size();
             return count;
@@ -123,10 +139,15 @@ public class LazyList<E> extends AbstractList<E> implements Serializable {
         if ((backingList != null && nextToken == null) || (!noLimit() && index >= maxResults)) {
             return;
         }
+        
+        if (nextToken == null && offsetNextToken != null) {
+        	nextToken = offsetNextToken;
+        }
 
         if (backingList == null) {
             backingList = new GrowthList();
         }
+        //run offset query if not yet executed
         if (offsetQuery != null && !offsetExecuted) {
         	offsetExecuted = true;
         	int expectedOffset = origQuery.getOffset();
@@ -195,6 +216,11 @@ public class LazyList<E> extends AbstractList<E> implements Serializable {
                 for (Item item : qr.getItems()) {
                     backingList.add((E) em.buildObject(genericReturnType, item.getName(), item.getAttributes()));
                 }
+                
+                if (origQuery.hasLimit() && backingList.size() == origQuery.getLimit()) {
+                	nextToken = null;
+                	break;
+                }
 
                 if (qr.getNextToken() == null || (!noLimit() && qr.getItems().size() == limit)) {
                     nextToken = null;
@@ -211,6 +237,119 @@ public class LazyList<E> extends AbstractList<E> implements Serializable {
             }
         }
 
+    }
+    
+    private synchronized void calculateCountWithOffset() {
+    	if (count > -1) {
+    		return;
+    	}
+
+        if (offsetQuery != null && !offsetExecuted) {
+        	offsetExecuted = true;
+        	int expectedOffset = origQuery.getOffset();
+        	int currentCount = 0;
+        	while (currentCount < expectedOffset) {
+        		SelectResult qr;
+        		try {
+        			if (logger.isLoggable(Level.FINER)) {
+        				logger.finer("offset query for lazylist=" + offsetQuery);
+        			}
+        			int limit = expectedOffset - currentCount;
+        			String limitQuery = offsetQuery + " limit " + limit;
+                    if (em.getFactory().isPrintQueries())
+                        System.out.println("offset query in lazylist=" + limitQuery);
+                    qr = DomainHelper.selectItems(this.em.getSimpleDb(), limitQuery, offsetNextToken, isConsistentRead());
+                    for (Item item : qr.getItems()) {
+                    	for (Attribute attribute : item.getAttributes()) {
+                    		if (attribute.getName().equalsIgnoreCase("count")) {
+                    			try {
+                                    currentCount += Integer.parseInt(attribute.getValue());
+                    			} catch (NumberFormatException e) {
+                    				//do nothing
+                    			}
+                    		}
+                    	}
+                    }
+                    
+                    if (qr.getNextToken() == null) {
+                    	offsetNextToken = null;
+                        break;
+                    }
+                    if (!noLimit() && currentCount == expectedOffset) {
+                        break;
+                    }
+
+                    if (!noLimit() && currentCount > expectedOffset) {
+                        throw new PersistenceException("Got more results than the offset.");
+                    }
+
+                    offsetNextToken = qr.getNextToken();
+        		} catch (AmazonClientException e) {
+                    throw new PersistenceException("Offsest query failed: Domain=" + domainName + " -> " + origQuery + "; offset query: " + offsetQuery, e);
+        		}
+        	}
+            
+            if (offsetNextToken == null) {
+            	return;
+            }
+        }
+
+        String nextToken = offsetNextToken;
+        String countQuery = SimpleDBQuery.convertToCountQuery(realQuery);
+        int currentCount = 0;
+        do {
+            SelectResult qr;
+            try {
+                if (logger.isLoggable(Level.FINER))
+                    logger.finer("query for lazylist=" + origQuery);
+
+                int limit = maxResults - currentCount;
+                String limitQuery = countQuery + " limit " + (noLimit() ? maxResultsPerToken : Math.min(maxResultsPerToken, limit));
+                if (em.getFactory().isPrintQueries())
+                    System.out.println("query in lazylist=" + limitQuery);
+                qr = DomainHelper.selectItems(this.em.getSimpleDb(), limitQuery, nextToken, isConsistentRead());
+                
+                int value = 0;
+                for (Item item : qr.getItems()) {
+                	for (Attribute attribute : item.getAttributes()) {
+                		if (attribute.getName().equalsIgnoreCase("count")) {
+                			try {
+                                value = Integer.parseInt(attribute.getValue());
+                			} catch (NumberFormatException e) {
+                				//do nothing
+                			}
+                		}
+                	}
+                }
+                currentCount += value;
+                
+                //if ((hasLimit() ))
+                
+                if (origQuery.hasLimit() && currentCount == origQuery.getLimit()) {
+                	nextToken = null;
+                	break;
+                }
+                
+                if (!noLimit() && value == limit) {
+                	nextToken = null;
+                	break;
+                }
+
+                if (qr.getNextToken() == null) {
+                    nextToken = null;
+                    break;
+                }
+
+                if (!noLimit() && qr.getItems().size() > limit) {
+                    throw new PersistenceException("Got more results than the limit.");
+                }
+
+                nextToken = qr.getNextToken();
+            } catch (AmazonClientException e) {
+                throw new PersistenceException("Query failed: Domain=" + domainName + " -> " + origQuery, e);
+            }
+        } while (nextToken != null);
+        count = currentCount;
     }
 
     private boolean noLimit() {
@@ -230,7 +369,15 @@ public class LazyList<E> extends AbstractList<E> implements Serializable {
         return consistentRead;
     }
 
-    private class LazyListIterator implements Iterator<E> {
+    public boolean isLoadAllOnSize() {
+		return loadAllOnSize;
+	}
+
+	public void setLoadAllOnSize(boolean loadAllOnSize) {
+		this.loadAllOnSize = loadAllOnSize;
+	}
+
+	private class LazyListIterator implements Iterator<E> {
         private int iNext = 0;
 
         public boolean hasNext() {
